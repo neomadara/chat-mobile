@@ -1,0 +1,94 @@
+database_schema.txt
+Fecha de implementación: 2026-05-11
+
+════════════════════════════════════════
+1. TABLAS
+════════════════════════════════════════
+
+── profiles ──
+  id        uuid  PRIMARY KEY  REFERENCES auth.users(id) ON DELETE CASCADE
+  full_name text
+
+── chatrooms ──
+  id           uuid        PRIMARY KEY  DEFAULT gen_random_uuid()
+  remitente    uuid        NOT NULL     REFERENCES profiles.id ON DELETE CASCADE
+  destinatario uuid        NOT NULL     REFERENCES profiles.id ON DELETE CASCADE
+  created_at   timestamptz DEFAULT now()
+
+── messages ──
+  id             uuid      PRIMARY KEY  DEFAULT gen_random_uuid()
+  created_at     timestamptz            DEFAULT now()
+  chatroom_id    uuid      NOT NULL     REFERENCES chatrooms.id ON DELETE CASCADE
+  remitente      uuid      NOT NULL     REFERENCES profiles.id  ON DELETE CASCADE
+  destinatario   uuid      NOT NULL     REFERENCES profiles.id  ON DELETE CASCADE
+  body           text      NOT NULL     CHECK char_length(body) <= 300
+  is_leido       boolean                DEFAULT false
+  msg_type       smallint               DEFAULT 1 — valores: 0=eliminado, 1=texto
+  id_ref         uuid      nullable     REFERENCES messages.id ON DELETE SET NULL
+  msg_extra_data jsonb                  DEFAULT {}
+
+════════════════════════════════════════
+2. ÍNDICES
+════════════════════════════════════════
+
+  idx_messages_chatroom_id    ON messages(chatroom_id)
+  idx_messages_remitente      ON messages(remitente)
+  idx_messages_destinatario   ON messages(destinatario)
+  idx_messages_created_at     ON messages(created_at DESC)
+  idx_chatrooms_remitente     ON chatrooms(remitente)
+  idx_chatrooms_destinatario  ON chatrooms(destinatario)
+
+════════════════════════════════════════
+3. ROW LEVEL SECURITY (RLS)
+════════════════════════════════════════
+
+── profiles ──
+  SELECT  → cualquier usuario autenticado
+  INSERT  → solo puedes insertar tu propio perfil (auth.uid() = id)
+  UPDATE  → solo puedes actualizar tu propio perfil (auth.uid() = id)
+
+── chatrooms ──
+  SELECT  → solo si eres remitente o destinatario
+  INSERT  → solo si eres remitente o destinatario
+  DELETE  → solo si eres remitente o destinatario
+
+── messages ──
+  SELECT  → solo si eres remitente o destinatario
+  INSERT  → solo si eres el remitente
+  UPDATE  → solo si eres remitente o destinatario
+
+════════════════════════════════════════
+4. TRIGGERS
+════════════════════════════════════════
+
+  on_auth_user_created
+  → Se dispara AFTER INSERT en auth.users
+  → Llama a handle_new_user()
+  → Inserta automáticamente un registro en profiles
+     con el id y full_name del nuevo usuario
+
+════════════════════════════════════════
+5. TIPOS DE MENSAJE (msg_type)
+════════════════════════════════════════
+
+  0 → eliminado (soft delete)
+  1 → texto simple (máximo 300 caracteres)
+
+════════════════════════════════════════
+6. SCRIPT DE MIGRACIÓN COMPLETO
+════════════════════════════════════════
+
+  Ejecutar en orden en Supabase SQL Editor:
+
+  001 → CREATE TABLE profiles + RLS
+  002 → CREATE TABLE chatrooms + RLS
+  003 → CREATE TABLE messages + RLS + CHECK constraints
+  004 → CREATE INDEX (6 índices)
+  005 → CREATE TRIGGER on_auth_user_created + handle_new_user()
+  006 → CREATE FUNCTION get_my_chatrooms()
+  007 → CREATE FUNCTION get_chatroom_messages_v2()
+  008 → CREATE FUNCTION check_chatroom_exist()
+  009 → CREATE FUNCTION despacho_de_mensaje()
+  010 → CREATE FUNCTION delete_message()
+  011 → CREATE FUNCTION delete_soft_chatroom()
+  012 → SEED: 4 usuarios, 3 chatrooms, 175+ mensajes

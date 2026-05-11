@@ -1,0 +1,162 @@
+rpc_functions.txt
+Fecha de implementación: 2026-05-11
+
+════════════════════════════════════════
+1. get_my_chatrooms()
+════════════════════════════════════════
+
+Propósito:
+  Obtener todos los chatrooms del usuario autenticado
+  con información del interlocutor y último mensaje.
+
+Parámetros de entrada:
+  Ninguno — usa auth.uid() internamente
+
+Parámetros de salida:
+  chatroom_id     uuid        ID del chatroom
+  friend_id       uuid        ID del interlocutor
+  friend_name     text        Nombre del interlocutor
+  last_message    text        Cuerpo del último mensaje
+  last_message_at timestamptz Fecha del último mensaje
+  unread_count    bigint      Mensajes no leídos
+
+Lógica de negocio:
+  1. Busca todos los chatrooms donde auth.uid() es remitente o destinatario
+  2. Determina quién es el "amigo" (el que no es auth.uid())
+  3. Obtiene el último mensaje de cada chatroom via LATERAL JOIN
+  4. Cuenta los mensajes no leídos donde destinatario = auth.uid()
+  5. Ordena por fecha del último mensaje descendente
+
+════════════════════════════════════════
+2. get_chatroom_messages_v2(friend_id_arg)
+════════════════════════════════════════
+
+Propósito:
+  Obtener mensajes de un chatroom específico agrupados
+  por fecha y marcar automáticamente como leídos.
+
+Parámetros de entrada:
+  friend_id_arg  uuid  ID del interlocutor
+
+Parámetros de salida:
+  date_trunc     timestamptz  Fecha del grupo (truncada a día)
+  mensajes_list  jsonb        Array de mensajes del día
+
+Lógica de negocio:
+  1. Busca el chatroom entre auth.uid() y friend_id_arg
+  2. Si no existe el chatroom retorna vacío
+  3. Marca como leídos (is_leido = true) todos los mensajes
+     donde destinatario = auth.uid() e is_leido = false
+  4. Agrupa los mensajes por día con date_trunc('day', created_at)
+  5. Dentro de cada grupo ordena los mensajes por created_at ASC
+  6. Excluye mensajes con msg_type = 0 (eliminados)
+
+Estructura de cada mensaje en mensajes_list:
+  {
+    id, body, remitente, destinatario,
+    created_at, is_leido, msg_type,
+    id_ref, msg_extra_data
+  }
+
+════════════════════════════════════════
+3. check_chatroom_exist(current_id, friend_id)
+════════════════════════════════════════
+
+Propósito:
+  Obtener el ID de un chatroom entre dos usuarios.
+  Si no existe, lo crea automáticamente.
+
+Parámetros de entrada:
+  current_id  uuid  ID del usuario actual
+  friend_id   uuid  ID del interlocutor
+
+Parámetros de salida:
+  uuid  ID del chatroom (existente o recién creado)
+
+Lógica de negocio:
+  1. Busca chatroom donde (remitente = current_id AND destinatario = friend_id)
+     OR (remitente = friend_id AND destinatario = current_id)
+  2. Si existe retorna su ID
+  3. Si no existe hace INSERT y retorna el nuevo ID
+
+════════════════════════════════════════
+4. despacho_de_mensaje(mensajito)
+════════════════════════════════════════
+
+Propósito:
+  Enviar un mensaje validando los datos, creando el
+  chatroom si no existe e insertando el mensaje.
+
+Parámetros de entrada:
+  mensajito  jsonb  Objeto con los siguientes campos:
+    {
+      remitente:    uuid     (obligatorio)
+      destinatario: uuid     (obligatorio)
+      body:         text     (obligatorio, max 300 chars)
+      msg_type:     smallint (opcional, default 1)
+      id_ref:       uuid     (opcional, para respuestas)
+      msg_extra_data: jsonb  (opcional, default {})
+    }
+
+Parámetros de salida:
+  jsonb  Mensaje insertado con todos sus campos:
+    {
+      id, chatroom_id, remitente, destinatario,
+      body, msg_type, created_at, is_leido
+    }
+
+Lógica de negocio:
+  1. Extrae campos del objeto mensajito
+  2. Valida que remitente = auth.uid() (no puedes enviar como otro)
+  3. Valida que body no supere 300 caracteres
+  4. Valida que msg_type sea 0 o 1
+  5. Llama a check_chatroom_exist() para obtener o crear chatroom
+  6. Inserta el mensaje en la tabla messages
+  7. Retorna el mensaje insertado como jsonb
+
+════════════════════════════════════════
+5. delete_message(p_message_id)
+════════════════════════════════════════
+
+Propósito:
+  Eliminar un mensaje de forma suave (soft delete)
+  cambiando msg_type a 0. Solo permite eliminar
+  mensajes propios del usuario autenticado.
+
+Parámetros de entrada:
+  p_message_id  uuid  ID del mensaje a eliminar
+
+Parámetros de salida:
+  jsonb  Resultado de la operación:
+    { id, msg_type, success }
+
+Lógica de negocio:
+  1. Hace UPDATE SET msg_type = 0
+     WHERE id = p_message_id AND remitente = auth.uid()
+  2. Si no encuentra el mensaje (no existe o no es tuyo)
+     lanza excepción 'Mensaje no encontrado o no autorizado'
+  3. Retorna los datos del mensaje actualizado
+
+════════════════════════════════════════
+6. delete_soft_chatroom(session, chatroom_id)
+════════════════════════════════════════
+
+Propósito:
+  Eliminar un chatroom verificando que el usuario
+  autenticado sea participante del mismo.
+
+Parámetros de entrada:
+  p_session     jsonb  Objeto de sesión del usuario
+  p_chatroom_id uuid   ID del chatroom a eliminar
+
+Parámetros de salida:
+  jsonb  Resultado de la operación:
+    { success, chatroom_id }
+
+Lógica de negocio:
+  1. Obtiene auth.uid() como v_user_id
+  2. Verifica que exista un chatroom con ese ID
+     donde remitente = v_user_id OR destinatario = v_user_id
+  3. Si no existe lanza excepción 'Chatroom no encontrado o no autorizado'
+  4. Elimina el chatroom
+  5. Retorna confirmación con el ID eliminado
