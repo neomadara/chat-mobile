@@ -76,3 +76,18 @@ Luego sincroniza chat-mobile:
 cd ../chat-mobile
 git subtree pull --prefix=src/shared https://github.com/TU_USUARIO/chat-shared.git main --squash
 ```
+
+
+### Usando el remote `shared`
+
+Jalar cambios desde chat-shared:
+
+```bash
+git subtree pull --prefix=src/shared shared main --squash
+```
+
+Empujar cambios hacia chat-shared:
+
+```bash
+git subtree push --prefix=src/shared shared main
+```
