@@ -54,3 +54,25 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Sincronización con chat-shared (git subtree)
+
+Dentro de chat-web, edita `src/shared/services/chatService.js`:
+
+```bash
+git add .
+git commit -m "feat: update chatService"
+```
+
+Empuja ese cambio de vuelta a chat-shared:
+
+```bash
+git subtree push --prefix=src/shared https://github.com/TU_USUARIO/chat-shared.git main
+```
+
+Luego sincroniza chat-mobile:
+
+```bash
+cd ../chat-mobile
+git subtree pull --prefix=src/shared https://github.com/TU_USUARIO/chat-shared.git main --squash
+```
