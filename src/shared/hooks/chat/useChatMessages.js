@@ -59,22 +59,33 @@ export const useChatMessages = (friendId, session) => {
 
     const channel = getSupabase()
       .channel(channelName)
-      .on(
+  .on(
     'postgres_changes',
     { event: 'INSERT', schema: 'public', table: 'messages' },
     (payload) => {
-      console.log('[Realtime] mensaje recibido:', payload)
+      console.log('[Realtime] INSERT recibido:', payload)
       const msg = payload.new
       const isRelevant =
         (msg.remitente === session.user.id && msg.destinatario === friendId) ||
         (msg.remitente === friendId && msg.destinatario === session.user.id)
-      console.log('[Realtime] isRelevant:', isRelevant)
       if (isRelevant) debouncedInvalidate()
     }
   )
-      .subscribe((status) => {
-        console.log('[Realtime] status:', status)
-      })
+  .on(
+    'postgres_changes',
+    { event: 'UPDATE', schema: 'public', table: 'messages' },
+    (payload) => {
+      console.log('[Realtime] UPDATE recibido:', payload)
+      const msg = payload.new
+      const isRelevant =
+        (msg.remitente === session.user.id && msg.destinatario === friendId) ||
+        (msg.remitente === friendId && msg.destinatario === session.user.id)
+      if (isRelevant) debouncedInvalidate()
+    }
+  )
+  .subscribe((status) => {
+    console.log('[Realtime] status:', status)
+  })
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
