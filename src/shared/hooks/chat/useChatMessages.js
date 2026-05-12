@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react'
 import { chatService } from '../../services/chatService'
 import { getSupabase } from '../../lib/supabase'
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 30
 
 export const useChatMessages = (friendId, session) => {
   const queryClient = useQueryClient()
@@ -12,27 +12,29 @@ export const useChatMessages = (friendId, session) => {
   const query = useInfiniteQuery({
     queryKey: ['chatMessages', friendId, session?.user?.id],
     queryFn: async ({ pageParam = 1 }) => {
+      // Todas las páginas usan getChatroomMessagesPaginated
+      const data = await chatService.getChatroomMessagesPaginated(
+        friendId, pageParam, PAGE_SIZE, session
+      )
+
+      // En la primera carga también marcamos leídos via RPC
+      // sin usar sus datos — solo para el efecto secundario
       if (pageParam === 1) {
-        // Primera carga — usa RPC que agrupa por fecha y marca leídos
-        const data = await chatService.getChatroomMessages(friendId, session)
-        return { groups: data, page: 1, isFirstPage: true }
-      } else {
-        // Páginas siguientes — query directa paginada
-        const data = await chatService.getChatroomMessagesPaginated(
-          friendId, pageParam, PAGE_SIZE, session
-        )
-        return { messages: data, page: pageParam, isFirstPage: false }
+        chatService.getChatroomMessages(friendId, session).catch(() => {})
+      }
+
+      // Agrupar por fecha localmente
+      const groups = chatService.groupMessagesByDate(data || [])
+
+      return {
+        groups,
+        page: pageParam,
+        hasMore: data?.length >= PAGE_SIZE
       }
     },
-    getNextPageParam: (lastPage) => {
-      // Si la última página trajo menos mensajes que PAGE_SIZE, no hay más
-      if (lastPage.isFirstPage) return undefined
-      if (!lastPage.messages || lastPage.messages.length < PAGE_SIZE) return undefined
-      return lastPage.page + 1
-    },
     getPreviousPageParam: (firstPage) => {
-      if (firstPage.page <= 1) return undefined
-      return firstPage.page - 1
+      if (!firstPage.hasMore) return undefined
+      return firstPage.page + 1
     },
     initialPageParam: 1,
     enabled: !!friendId && !!session?.user?.id,

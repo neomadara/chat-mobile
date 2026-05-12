@@ -53,29 +53,29 @@ export const chatService = {
   },
 
   async getChatroomMessagesPaginated(friendId, page = 1, pageSize = 20, session) {
-    if (!friendId || !session?.user?.id) throw new Error('Parámetros inválidos')
+  if (!friendId || !session?.user?.id) throw new Error('Parámetros inválidos')
 
-    // Primero obtener el chatroom_id
-    const chatroomId = await chatService.getOrCreateChatroomId(
-      session.user.id, friendId
-    )
+  // Primero obtener el chatroom_id
+  const chatroomId = await chatService.getOrCreateChatroomId(
+    session.user.id, friendId
+  )
 
-    const from = (page - 1) * pageSize
-    const to = from + pageSize - 1
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
 
-    const { data, error } = await getSupabase()
-      .from('messages')
-      .select('*')
-      .eq('chatroom_id', chatroomId)
-      .neq('msg_type', 0)
-      .order('created_at', { ascending: false })
-      .range(from, to)
+  const { data, error } = await getSupabase()
+    .from('messages')
+    .select('*')
+    .eq('chatroom_id', chatroomId)
+    .neq('msg_type', 0)
+    .order('created_at', { ascending: false })
+    .range(from, to)
 
-    if (error) throw error
+  if (error) throw error
 
-    // Retornar en orden ascendente para que se vean bien en la UI
-    return data ? data.reverse() : []
-  },
+  // Retornar en orden ascendente para que se vean bien en la UI
+  return data ? data.reverse() : []
+},
 
   async getOrCreateChatroomId(userId, friendId) {
     const { data, error } = await getSupabase().rpc('check_chatroom_exist', {
