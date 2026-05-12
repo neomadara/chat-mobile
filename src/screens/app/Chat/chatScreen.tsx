@@ -40,7 +40,11 @@ type ChatScreenProps = {
 
 const ChatScreen = ({ session }: ChatScreenProps) => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'ChatScreen'>>()
-  const { data: chatrooms, isLoading, refetch } = useChatRooms(session)
+  const { data: chatrooms, isLoading, refetch, error } = useChatRooms(session)
+
+  console.log('session:', session?.user?.id)
+  console.log('chatrooms:', JSON.stringify(chatrooms))
+  console.log('error:', error)
 
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterType>('Todos')
