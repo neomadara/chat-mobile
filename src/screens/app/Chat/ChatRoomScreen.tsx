@@ -54,9 +54,9 @@ type SendMessageMutation = {
 type InfiniteQueryResult = {
   data: { pages: PageData[] } | undefined
   isLoading: boolean
-  fetchPreviousPage: () => Promise<unknown>
-  hasPreviousPage: boolean
-  isFetchingPreviousPage: boolean
+  fetchNextPage: () => Promise<unknown>
+  hasNextPage: boolean
+  isFetchingNextPage: boolean
 }
 
 const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
@@ -68,18 +68,20 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
   const {
     data,
     isLoading,
-    fetchPreviousPage,
-    hasPreviousPage,
-    isFetchingPreviousPage
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
   } = useChatMessages(friendId, session) as unknown as InfiniteQueryResult
 
   const { mutate: sendMessage, isPending } =
     useSendMessage() as unknown as SendMessageMutation
 
-  const allGroups = data?.pages?.flatMap(page => page.groups || []) ?? []
+  const allGroups = (data?.pages ?? [])
+    .flatMap(page => page.groups ?? [])
+    .sort((a, b) => new Date(a.date_trunc).getTime() - new Date(b.date_trunc).getTime())
 
   const totalMessages = allGroups.reduce((acc, group) => acc + (group.mensajes_list?.length ?? 0), 0)
-  console.log(`[ChatRoom:${friendId}] páginas=${data?.pages?.length ?? 0} grupos=${allGroups.length} mensajes=${totalMessages} hasPreviousPage=${hasPreviousPage}`)
+  console.log(`[ChatRoom:${friendId}] páginas=${data?.pages?.length ?? 0} grupos=${allGroups.length} mensajes=${totalMessages} hasNextPage=${hasNextPage}`)
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -124,11 +126,20 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
   }, [])
 
   const handleLoadMore = useCallback(async () => {
-    if (!hasPreviousPage || isFetchingPreviousPage) return
+    if (!hasNextPage || isFetchingNextPage) return
     setIsLoadingMore(true)
-    await fetchPreviousPage()
+    await fetchNextPage()
     setIsLoadingMore(false)
-  }, [hasPreviousPage, isFetchingPreviousPage, fetchPreviousPage])
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  const onScroll = useCallback(
+    ({ nativeEvent }: { nativeEvent: { contentOffset: { y: number } } }) => {
+      if (nativeEvent.contentOffset.y < 80 && hasNextPage && !isFetchingNextPage) {
+        handleLoadMore()
+      }
+    },
+    [hasNextPage, isFetchingNextPage, handleLoadMore]
+  )
 
   const renderGroup = useCallback(
     ({ item }: { item: MessageGroup }) => (
@@ -164,6 +175,8 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
         maxToRenderPerBatch={5}
         windowSize={15}
         removeClippedSubviews={Platform.OS === 'android'}
+        onScroll={onScroll}
+        scrollEventThrottle={400}
         onContentSizeChange={() => {
           if (!hasScrolledRef.current && allGroups.length > 0) {
             hasScrolledRef.current = true
@@ -171,13 +184,13 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
           }
         }}
         ListHeaderComponent={
-          hasPreviousPage ? (
+          hasNextPage ? (
             <TouchableOpacity
               style={styles.loadMoreBtn}
               onPress={handleLoadMore}
-              disabled={isFetchingPreviousPage}
+              disabled={isFetchingNextPage}
             >
-              {isFetchingPreviousPage ? (
+              {isFetchingNextPage ? (
                 <ActivityIndicator size='small' color='#075E54' />
               ) : (
                 <Text style={styles.loadMoreText}>↑ Cargar mensajes anteriores</Text>
