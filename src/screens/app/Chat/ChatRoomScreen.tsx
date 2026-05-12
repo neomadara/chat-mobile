@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -44,7 +44,7 @@ type SendMessageMutation = {
 const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
   const { friendId } = route.params
   const flatListRef = useRef<FlatList<MessageGroup> | null>(null)
-  const [, setPage] = useState(1)
+  const prevGroupsLengthRef = useRef<number>(0)
 
   const { data: groups, isLoading } = useChatMessages(friendId, session)
   const { mutate: sendMessage, isPending } =
@@ -57,7 +57,11 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
   }, [])
 
   useEffect(() => {
-    if (groups?.length) scrollToBottom()
+    const currentLength = groups?.length ?? 0
+    if (currentLength > prevGroupsLengthRef.current) {
+      scrollToBottom()
+    }
+    prevGroupsLengthRef.current = currentLength
   }, [groups, scrollToBottom])
 
   const handleSend = useCallback(
@@ -81,7 +85,7 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
   )
 
   const handleLoadMore = useCallback(() => {
-    setPage((prev) => prev + 1)
+    // reservado para paginación futura
   }, [])
 
   const renderGroup = useCallback(
@@ -89,15 +93,6 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
       <MemoizedMessageGroup group={item} currentUserId={session.user.id} />
     ),
     [session.user.id]
-  )
-
-  const getItemLayout = useCallback(
-    (_data: ArrayLike<MessageGroup> | null | undefined, index: number) => ({
-      length: 80,
-      offset: 80 * index,
-      index
-    }),
-    []
   )
 
   if (isLoading) {
@@ -119,7 +114,6 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
         data={(groups || []) as MessageGroup[]}
         keyExtractor={(item) => item.date_trunc}
         renderItem={renderGroup}
-        getItemLayout={getItemLayout}
         initialNumToRender={8}
         maxToRenderPerBatch={5}
         windowSize={15}

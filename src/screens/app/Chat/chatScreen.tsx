@@ -1,7 +1,7 @@
 import { useNavigation } from '@react-navigation/native'
 import type { StackNavigationProp } from '@react-navigation/stack'
 import type { Session } from '@supabase/supabase-js'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   FlatList,
   RefreshControl,
@@ -50,7 +50,7 @@ const ChatScreen = ({ session }: ChatScreenProps) => {
   const [filter, setFilter] = useState<FilterType>('Todos')
   const [refreshing, setRefreshing] = useState(false)
 
-  const rooms = (chatrooms ?? []) as ChatRoom[]
+  const rooms = useMemo(() => (chatrooms ?? []) as ChatRoom[], [chatrooms])
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -58,7 +58,7 @@ const ChatScreen = ({ session }: ChatScreenProps) => {
     setRefreshing(false)
   }, [refetch])
 
-  const filtered = rooms.filter((room: ChatRoom) => {
+  const filtered = useMemo(() => rooms.filter((room: ChatRoom) => {
     const name = room.friend_name ?? ''
     const unread = room.unread_count ?? 0
     const matchSearch = name.toLowerCase().includes(search.toLowerCase())
@@ -66,9 +66,9 @@ const ChatScreen = ({ session }: ChatScreenProps) => {
     if (filter === 'Sin leer') return matchSearch && unread > 0
     if (filter === 'Leídos') return matchSearch && unread === 0
     return matchSearch
-  })
+  }), [rooms, search, filter])
 
-  const renderItem = ({ item }: { item: ChatRoom }) => (
+  const renderItem = useCallback(({ item }: { item: ChatRoom }) => (
     <TouchableOpacity
       style={styles.roomItem}
       onPress={() =>
@@ -109,7 +109,7 @@ const ChatScreen = ({ session }: ChatScreenProps) => {
         </View>
       </View>
     </TouchableOpacity>
-  )
+  ), [navigation])
 
   return (
     <View style={styles.container}>
