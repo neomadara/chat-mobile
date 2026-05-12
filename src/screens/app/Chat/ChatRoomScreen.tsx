@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -11,6 +13,7 @@ import {
 import MemoizedMessageGroup from '../../../shared/components/chat/MemoizedMessageGroup'
 import { useChatMessages } from '../../../shared/hooks/chat/useChatMessages'
 import { useSendMessage } from '../../../shared/hooks/chat/useSendMessage'
+import { chatService } from '../../../shared/services/chatService'
 import InputChatBox from './components/InputChatBox'
 
 type ChatRoomRouteParams = {
@@ -25,6 +28,13 @@ type ChatRoomScreenProps = {
 
 type MessageGroup = {
   date_trunc: string
+  mensajes_list?: unknown[]
+}
+
+type PageData = {
+  isFirstPage?: boolean
+  groups?: MessageGroup[]
+  messages?: unknown[]
 }
 
 type SendMessagePayload = {
@@ -41,14 +51,38 @@ type SendMessageMutation = {
   isPending: boolean
 }
 
+type InfiniteQueryResult = {
+  data: { pages: PageData[] } | undefined
+  isLoading: boolean
+  fetchPreviousPage: () => Promise<unknown>
+  hasPreviousPage: boolean
+  isFetchingPreviousPage: boolean
+}
+
 const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
   const { friendId } = route.params
   const flatListRef = useRef<FlatList<MessageGroup> | null>(null)
-  const prevGroupsLengthRef = useRef<number>(0)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const hasScrolledRef = useRef(false)
 
-  const { data: groups, isLoading } = useChatMessages(friendId, session)
+  const {
+    data,
+    isLoading,
+    fetchPreviousPage,
+    hasPreviousPage,
+    isFetchingPreviousPage
+  } = useChatMessages(friendId, session) as unknown as InfiniteQueryResult
+
   const { mutate: sendMessage, isPending } =
-  useSendMessage() as unknown as SendMessageMutation
+    useSendMessage() as unknown as SendMessageMutation
+
+  const allGroups: MessageGroup[] = data?.pages?.flatMap((page: PageData) => {
+    if (page.isFirstPage) return page.groups ?? []
+    return (chatService.groupMessagesByDate(page.messages ?? []) as MessageGroup[])
+  }) ?? []
+
+  const totalMessages = allGroups.reduce((acc, group) => acc + (group.mensajes_list?.length ?? 0), 0)
+  console.log(`[ChatRoom:${friendId}] páginas=${data?.pages?.length ?? 0} grupos=${allGroups.length} mensajes=${totalMessages} hasPreviousPage=${hasPreviousPage}`)
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -57,17 +91,13 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
   }, [])
 
   useEffect(() => {
-    const currentLength = groups?.length ?? 0
-    if (currentLength > prevGroupsLengthRef.current) {
-      scrollToBottom()
-    }
-    prevGroupsLengthRef.current = currentLength
-  }, [groups, scrollToBottom])
+    // Reset flag cuando cambia la sala
+    hasScrolledRef.current = false
+  }, [friendId])
 
   const handleSend = useCallback(
     (body: string) => {
       if (!body.trim()) return
-
       const mensajito: SendMessagePayload = {
         remitente: session.user.id,
         destinatario: friendId,
@@ -76,29 +106,48 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
         id_ref: null,
         msg_extra_data: {}
       }
-
-      sendMessage(mensajito, {
-        onSuccess: scrollToBottom
-      })
+      sendMessage(mensajito, { onSuccess: scrollToBottom })
     },
     [session, friendId, sendMessage, scrollToBottom]
   )
 
-  const handleLoadMore = useCallback(() => {
-    // reservado para paginación futura
+  const handleDeleteMessage = useCallback((messageId: string | number) => {
+    Alert.alert(
+      'Eliminar mensaje',
+      '¿Estás seguro que deseas eliminar este mensaje?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => chatService.deleteMessage(messageId)
+        }
+      ]
+    )
   }, [])
+
+  const handleLoadMore = useCallback(async () => {
+    if (!hasPreviousPage || isFetchingPreviousPage) return
+    setIsLoadingMore(true)
+    await fetchPreviousPage()
+    setIsLoadingMore(false)
+  }, [hasPreviousPage, isFetchingPreviousPage, fetchPreviousPage])
 
   const renderGroup = useCallback(
     ({ item }: { item: MessageGroup }) => (
-      <MemoizedMessageGroup group={item} currentUserId={session.user.id} />
+      <MemoizedMessageGroup
+        group={item}
+        currentUserId={session.user.id}
+        onLongPressMessage={handleDeleteMessage}
+      />
     ),
-    [session.user.id]
+    [session.user.id, handleDeleteMessage]
   )
 
   if (isLoading) {
     return (
       <View style={styles.center}>
-        <Text style={styles.loadingText}>Cargando mensajes...</Text>
+        <ActivityIndicator color='#075E54' />
       </View>
     )
   }
@@ -111,18 +160,33 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
     >
       <FlatList
         ref={flatListRef}
-        data={(groups || []) as MessageGroup[]}
+        data={allGroups}
         keyExtractor={(item) => item.date_trunc}
         renderItem={renderGroup}
-        initialNumToRender={8}
+        initialNumToRender={50}
         maxToRenderPerBatch={5}
         windowSize={15}
         removeClippedSubviews={Platform.OS === 'android'}
-        onEndReachedThreshold={0.1}
+        onContentSizeChange={() => {
+          if (!hasScrolledRef.current && allGroups.length > 0) {
+            hasScrolledRef.current = true
+            flatListRef.current?.scrollToEnd({ animated: false })
+          }
+        }}
         ListHeaderComponent={
-          <TouchableOpacity style={styles.loadMoreBtn} onPress={handleLoadMore}>
-            <Text style={styles.loadMoreText}>Cargar mensajes anteriores</Text>
-          </TouchableOpacity>
+          hasPreviousPage ? (
+            <TouchableOpacity
+              style={styles.loadMoreBtn}
+              onPress={handleLoadMore}
+              disabled={isFetchingPreviousPage}
+            >
+              {isFetchingPreviousPage ? (
+                <ActivityIndicator size='small' color='#075E54' />
+              ) : (
+                <Text style={styles.loadMoreText}>↑ Cargar mensajes anteriores</Text>
+              )}
+            </TouchableOpacity>
+          ) : null
         }
         ListEmptyComponent={
           <View style={styles.center}>
@@ -140,10 +204,9 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ECE5DD' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  loadingText: { color: '#888780', fontSize: 14 },
-  emptyText: { color: '#888780', fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  loadMoreBtn: { alignItems: 'center', padding: 12 },
-  loadMoreText: { fontSize: 13, color: '#075E54', fontWeight: '500' }
+  loadMoreBtn: { alignItems: 'center', padding: 14 },
+  loadMoreText: { fontSize: 13, color: '#075E54', fontWeight: '500' },
+  emptyText: { color: '#888780', fontSize: 14, textAlign: 'center', lineHeight: 22 }
 })
 
 export default ChatRoomScreen
