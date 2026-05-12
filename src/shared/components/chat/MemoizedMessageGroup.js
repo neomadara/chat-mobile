@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import MessageSimple from './MessageSimple'
 
-const MemoizedMessageGroup = ({ group, currentUserId }) => {
+const MemoizedMessageGroup = ({ group, currentUserId, onLongPressMessage }) => {
   return (
     <View>
       <View style={styles.dateContainer}>
@@ -19,6 +19,7 @@ const MemoizedMessageGroup = ({ group, currentUserId }) => {
           key={message.id}
           message={message}
           isOwn={message.remitente === currentUserId}
+          onLongPress={onLongPressMessage ? () => onLongPressMessage(message.id) : undefined}
         />
       ))}
     </View>

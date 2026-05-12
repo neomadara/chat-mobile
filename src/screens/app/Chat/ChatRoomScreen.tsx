@@ -64,6 +64,7 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
   const flatListRef = useRef<FlatList<MessageGroup> | null>(null)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const hasScrolledRef = useRef(false)
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const {
     data,
@@ -179,8 +180,11 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
         scrollEventThrottle={400}
         onContentSizeChange={() => {
           if (!hasScrolledRef.current && allGroups.length > 0) {
-            hasScrolledRef.current = true
-            flatListRef.current?.scrollToEnd({ animated: false })
+            if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+            scrollTimerRef.current = setTimeout(() => {
+              hasScrolledRef.current = true
+              flatListRef.current?.scrollToEnd({ animated: false })
+            }, 200)
           }
         }}
         ListHeaderComponent={
