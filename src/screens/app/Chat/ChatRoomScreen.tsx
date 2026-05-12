@@ -1,3 +1,4 @@
+import { useHeaderHeight } from '@react-navigation/elements'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
@@ -61,6 +62,7 @@ type InfiniteQueryResult = {
 
 const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
   const { friendId } = route.params
+  const headerHeight = useHeaderHeight()
   const flatListRef = useRef<FlatList<MessageGroup> | null>(null)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const hasScrolledRef = useRef(false)
@@ -164,11 +166,12 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
+      behavior='padding'
+      keyboardVerticalOffset={headerHeight}
     >
       <FlatList
         ref={flatListRef}
+        style={styles.list}
         data={allGroups}
         keyExtractor={(item, index) => `${item.date_trunc}_${index}`}
         renderItem={renderGroup}
@@ -217,6 +220,7 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ECE5DD' },
+  list: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   loadMoreBtn: { alignItems: 'center', padding: 14 },
   loadMoreText: { fontSize: 13, color: '#075E54', fontWeight: '500' },
