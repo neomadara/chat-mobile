@@ -1,10 +1,14 @@
 import { memo } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
-const MessageSimple = ({ message, isOwn }) => {
+const MessageSimple = ({ message, isOwn, onLongPress }) => {
   return (
     <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}>
-      <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
+      <TouchableOpacity
+        style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}
+        onLongPress={onLongPress}
+        activeOpacity={0.8}
+      >
         <Text style={styles.body}>{message.body}</Text>
         <Text style={styles.time}>
           {new Date(message.created_at).toLocaleTimeString('es-CL', {
@@ -12,7 +16,7 @@ const MessageSimple = ({ message, isOwn }) => {
             minute: '2-digit'
           })}
         </Text>
-      </View>
+      </TouchableOpacity>
     </View>
   )
 }
