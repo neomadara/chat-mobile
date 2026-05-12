@@ -1,16 +1,16 @@
-import { supabase } from '../lib/supabase'
+import { getSupabase } from '../lib/supabase'
 
 export const chatService = {
 
   async getMyChatrooms() {
-    const { data, error } = await supabase.rpc('get_my_chatrooms')
+    const { data, error } = await getSupabase().rpc('get_my_chatrooms')
     if (error) throw error
     return data
   },
 
   async getChatroomMessages(friendId, session) {
     if (!friendId || !session?.user?.id) throw new Error('Parámetros inválidos')
-    const { data, error } = await supabase.rpc('get_chatroom_messages_v2', {
+    const { data, error } = await getSupabase().rpc('get_chatroom_messages_v2', {
       friend_id_arg: friendId
     })
     if (error) throw error
@@ -21,10 +21,7 @@ export const chatService = {
     if (!messages) return []
     return messages.map(group => ({
       date: new Date(group.date_trunc).toLocaleDateString('es-CL', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
       }),
       date_trunc: group.date_trunc,
       mensajes_list: group.mensajes_list
@@ -32,15 +29,13 @@ export const chatService = {
   },
 
   async sendMessage(mensajito) {
-    const { data, error } = await supabase.rpc('despacho_de_mensaje', {
-      mensajito
-    })
+    const { data, error } = await getSupabase().rpc('despacho_de_mensaje', { mensajito })
     if (error) throw error
     return data
   },
 
   async markMessageAsRead(messageId) {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('messages')
       .update({ is_leido: true })
       .eq('id', messageId)
@@ -49,7 +44,7 @@ export const chatService = {
   },
 
   async deleteChatroom(session, chatroomId) {
-    const { data, error } = await supabase.rpc('delete_soft_chatroom', {
+    const { data, error } = await getSupabase().rpc('delete_soft_chatroom', {
       p_session: session,
       p_chatroom_id: chatroomId
     })
@@ -61,7 +56,7 @@ export const chatService = {
     if (!friendId || !session?.user?.id) throw new Error('Parámetros inválidos')
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('messages')
       .select('*')
       .or(`remitente.eq.${session.user.id},destinatario.eq.${session.user.id}`)
@@ -73,7 +68,7 @@ export const chatService = {
   },
 
   async getOrCreateChatroomId(userId, friendId) {
-    const { data, error } = await supabase.rpc('check_chatroom_exist', {
+    const { data, error } = await getSupabase().rpc('check_chatroom_exist', {
       current_id: userId,
       friend_id: friendId
     })
@@ -82,11 +77,10 @@ export const chatService = {
   },
 
   async deleteMessage(messageId) {
-    const { data, error } = await supabase.rpc('delete_message', {
+    const { data, error } = await getSupabase().rpc('delete_message', {
       p_message_id: messageId
     })
     if (error) throw error
     return data
   }
-
 }
