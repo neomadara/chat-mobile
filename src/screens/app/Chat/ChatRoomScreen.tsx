@@ -1,4 +1,5 @@
 import { useHeaderHeight } from '@react-navigation/elements'
+import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
@@ -67,6 +68,7 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const hasScrolledRef = useRef(false)
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const queryClient = useQueryClient()
 
   const {
     data,
@@ -114,19 +116,24 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
   )
 
   const handleDeleteMessage = useCallback((messageId: string | number) => {
-    Alert.alert(
-      'Eliminar mensaje',
-      '¿Estás seguro que deseas eliminar este mensaje?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => chatService.deleteMessage(messageId)
+  Alert.alert(
+    'Eliminar mensaje',
+    '¿Estás seguro que deseas eliminar este mensaje?',
+    [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          await chatService.deleteMessage(messageId)
+          queryClient.invalidateQueries({
+            queryKey: ['chatMessages', friendId, session.user.id]
+          })
         }
-      ]
-    )
-  }, [])
+      }
+    ]
+  )
+}, [friendId, session.user.id, queryClient])
 
   const handleLoadMore = useCallback(async () => {
     if (!hasNextPage || isFetchingNextPage) return
