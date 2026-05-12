@@ -76,10 +76,7 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
   const { mutate: sendMessage, isPending } =
     useSendMessage() as unknown as SendMessageMutation
 
-  const allGroups: MessageGroup[] = data?.pages?.flatMap((page: PageData) => {
-    if (page.isFirstPage) return page.groups ?? []
-    return (chatService.groupMessagesByDate(page.messages ?? []) as MessageGroup[])
-  }) ?? []
+  const allGroups = data?.pages?.flatMap(page => page.groups || []) ?? []
 
   const totalMessages = allGroups.reduce((acc, group) => acc + (group.mensajes_list?.length ?? 0), 0)
   console.log(`[ChatRoom:${friendId}] páginas=${data?.pages?.length ?? 0} grupos=${allGroups.length} mensajes=${totalMessages} hasPreviousPage=${hasPreviousPage}`)
@@ -161,7 +158,7 @@ const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
       <FlatList
         ref={flatListRef}
         data={allGroups}
-        keyExtractor={(item) => item.date_trunc}
+        keyExtractor={(item, index) => `${item.date_trunc}_${index}`}
         renderItem={renderGroup}
         initialNumToRender={50}
         maxToRenderPerBatch={5}
