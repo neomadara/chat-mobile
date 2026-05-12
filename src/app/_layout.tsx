@@ -1,11 +1,17 @@
-import { supabase } from '@/shared/lib/supabase'
+import { getSupabase, initSupabase } from '@/shared/lib/supabase'
 import { Session } from '@supabase/supabase-js'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 
+initSupabase({
+  url: process.env.EXPO_PUBLIC_SUPABASE_URL,
+  anonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+})
+
 const queryClient = new QueryClient()
+const supabase = getSupabase()
 
 export const SessionContext = createContext<Session | null>(null)
 export const useSession = () => useContext(SessionContext)
