@@ -18,15 +18,25 @@ export const chatService = {
   },
 
   groupMessagesByDate(messages) {
-    if (!messages) return []
-    return messages.map(group => ({
-      date: new Date(group.date_trunc).toLocaleDateString('es-CL', {
-        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-      }),
-      date_trunc: group.date_trunc,
-      mensajes_list: group.mensajes_list
-    }))
-  },
+  if (!messages || !messages.length) return []
+
+  // Agrupar mensajes planos por fecha
+  const groups = {}
+  messages.forEach(msg => {
+    const day = new Date(msg.created_at).toISOString().split('T')[0]
+    if (!groups[day]) {
+      groups[day] = {
+        date_trunc: new Date(msg.created_at).toISOString(),
+        mensajes_list: []
+      }
+    }
+    groups[day].mensajes_list.push(msg)
+  })
+
+  return Object.values(groups).sort(
+    (a, b) => new Date(a.date_trunc) - new Date(b.date_trunc)
+  )
+},
 
   async sendMessage(mensajito) {
     const { data, error } = await getSupabase().rpc('despacho_de_mensaje', { mensajito })

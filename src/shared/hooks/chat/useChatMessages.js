@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
-import { chatService } from '../../services/chatService'
 import { getSupabase } from '../../lib/supabase'
+import { chatService } from '../../services/chatService'
 
 const PAGE_SIZE = 30
 
@@ -12,29 +12,29 @@ export const useChatMessages = (friendId, session) => {
   const query = useInfiniteQuery({
     queryKey: ['chatMessages', friendId, session?.user?.id],
     queryFn: async ({ pageParam = 1 }) => {
-      // Todas las páginas usan getChatroomMessagesPaginated
+      console.log('[useChatMessages] fetching page:', pageParam, 'friendId:', friendId)
+      
       const data = await chatService.getChatroomMessagesPaginated(
         friendId, pageParam, PAGE_SIZE, session
       )
+      
+      console.log('[useChatMessages] data length:', data?.length)
 
-      // En la primera carga también marcamos leídos via RPC
-      // sin usar sus datos — solo para el efecto secundario
       if (pageParam === 1) {
         chatService.getChatroomMessages(friendId, session).catch(() => {})
       }
 
-      // Agrupar por fecha localmente
       const groups = chatService.groupMessagesByDate(data || [])
 
       return {
         groups,
         page: pageParam,
-        hasMore: data?.length >= PAGE_SIZE
+        hasMore: (data?.length ?? 0) >= PAGE_SIZE
       }
     },
-    getPreviousPageParam: (firstPage) => {
-      if (!firstPage.hasMore) return undefined
-      return firstPage.page + 1
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.hasMore) return undefined
+      return lastPage.page + 1
     },
     initialPageParam: 1,
     enabled: !!friendId && !!session?.user?.id,
