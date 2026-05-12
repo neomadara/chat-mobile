@@ -54,17 +54,27 @@ export const chatService = {
 
   async getChatroomMessagesPaginated(friendId, page = 1, pageSize = 20, session) {
     if (!friendId || !session?.user?.id) throw new Error('Parámetros inválidos')
+
+    // Primero obtener el chatroom_id
+    const chatroomId = await chatService.getOrCreateChatroomId(
+      session.user.id, friendId
+    )
+
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
+
     const { data, error } = await getSupabase()
       .from('messages')
       .select('*')
-      .or(`remitente.eq.${session.user.id},destinatario.eq.${session.user.id}`)
+      .eq('chatroom_id', chatroomId)
       .neq('msg_type', 0)
       .order('created_at', { ascending: false })
       .range(from, to)
+
     if (error) throw error
-    return data
+
+    // Retornar en orden ascendente para que se vean bien en la UI
+    return data ? data.reverse() : []
   },
 
   async getOrCreateChatroomId(userId, friendId) {

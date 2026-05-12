@@ -1,15 +1,40 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { chatService } from '../../services/chatService'
 import { getSupabase } from '../../lib/supabase'
+
+const PAGE_SIZE = 20
 
 export const useChatMessages = (friendId, session) => {
   const queryClient = useQueryClient()
   const debounceRef = useRef(null)
 
-  const query = useQuery({
+  const query = useInfiniteQuery({
     queryKey: ['chatMessages', friendId, session?.user?.id],
-    queryFn: () => chatService.getChatroomMessages(friendId, session),
+    queryFn: async ({ pageParam = 1 }) => {
+      if (pageParam === 1) {
+        // Primera carga — usa RPC que agrupa por fecha y marca leídos
+        const data = await chatService.getChatroomMessages(friendId, session)
+        return { groups: data, page: 1, isFirstPage: true }
+      } else {
+        // Páginas siguientes — query directa paginada
+        const data = await chatService.getChatroomMessagesPaginated(
+          friendId, pageParam, PAGE_SIZE, session
+        )
+        return { messages: data, page: pageParam, isFirstPage: false }
+      }
+    },
+    getNextPageParam: (lastPage) => {
+      // Si la última página trajo menos mensajes que PAGE_SIZE, no hay más
+      if (lastPage.isFirstPage) return undefined
+      if (!lastPage.messages || lastPage.messages.length < PAGE_SIZE) return undefined
+      return lastPage.page + 1
+    },
+    getPreviousPageParam: (firstPage) => {
+      if (firstPage.page <= 1) return undefined
+      return firstPage.page - 1
+    },
+    initialPageParam: 1,
     enabled: !!friendId && !!session?.user?.id,
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000
