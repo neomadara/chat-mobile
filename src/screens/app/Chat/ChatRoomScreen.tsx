@@ -1,21 +1,54 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  View, FlatList, Text, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform, Alert
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native'
+import MemoizedMessageGroup from '../../../shared/components/chat/MemoizedMessageGroup'
 import { useChatMessages } from '../../../shared/hooks/chat/useChatMessages'
 import { useSendMessage } from '../../../shared/hooks/chat/useSendMessage'
-import { chatService } from '../../../shared/services/chatService'
-import MemoizedMessageGroup from '../../../shared/components/chat/MemoizedMessageGroup'
 import InputChatBox from './components/InputChatBox'
 
-const ChatRoomScreen = ({ route, session }) => {
-  const { friendId, friendName } = route.params
-  const flatListRef = useRef(null)
-  const [page, setPage] = useState(1)
+type ChatRoomRouteParams = {
+  friendId: string
+  friendName?: string
+}
+
+type ChatRoomScreenProps = {
+  route: { params: ChatRoomRouteParams }
+  session: { user: { id: string } }
+}
+
+type MessageGroup = {
+  date_trunc: string
+}
+
+type SendMessagePayload = {
+  remitente: string
+  destinatario: string
+  body: string
+  msg_type: number
+  id_ref: null
+  msg_extra_data: Record<string, unknown>
+}
+
+type SendMessageMutation = {
+  mutate: (mensajito: SendMessagePayload, options?: { onSuccess?: () => void }) => void
+  isPending: boolean
+}
+
+const ChatRoomScreen = ({ route, session }: ChatRoomScreenProps) => {
+  const { friendId } = route.params
+  const flatListRef = useRef<FlatList<MessageGroup> | null>(null)
+  const [, setPage] = useState(1)
 
   const { data: groups, isLoading } = useChatMessages(friendId, session)
-  const { mutate: sendMessage, isPending } = useSendMessage()
+  const { mutate: sendMessage, isPending } =
+  useSendMessage() as unknown as SendMessageMutation
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -25,57 +58,47 @@ const ChatRoomScreen = ({ route, session }) => {
 
   useEffect(() => {
     if (groups?.length) scrollToBottom()
-  }, [groups])
+  }, [groups, scrollToBottom])
 
-  const handleSend = useCallback((body) => {
-    if (!body.trim()) return
+  const handleSend = useCallback(
+    (body: string) => {
+      if (!body.trim()) return
 
-    const mensajito = {
-      remitente: session.user.id,
-      destinatario: friendId,
-      body: body.trim(),
-      msg_type: 1,
-      id_ref: null,
-      msg_extra_data: {}
-    }
+      const mensajito: SendMessagePayload = {
+        remitente: session.user.id,
+        destinatario: friendId,
+        body: body.trim(),
+        msg_type: 1,
+        id_ref: null,
+        msg_extra_data: {}
+      }
 
-    sendMessage(mensajito, {
-      onSuccess: scrollToBottom
-    })
-  }, [session, friendId, sendMessage, scrollToBottom])
-
-  const handleDeleteMessage = useCallback((messageId) => {
-    Alert.alert(
-      'Eliminar mensaje',
-      '¿Estás seguro que deseas eliminar este mensaje?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => chatService.deleteMessage(messageId)
-        }
-      ]
-    )
-  }, [])
+      sendMessage(mensajito, {
+        onSuccess: scrollToBottom
+      })
+    },
+    [session, friendId, sendMessage, scrollToBottom]
+  )
 
   const handleLoadMore = useCallback(() => {
-    setPage(prev => prev + 1)
+    setPage((prev) => prev + 1)
   }, [])
 
-  const renderGroup = useCallback(({ item }) => (
-    <MemoizedMessageGroup
-      group={item}
-      currentUserId={session.user.id}
-      onLongPressMessage={handleDeleteMessage}
-    />
-  ), [session.user.id, handleDeleteMessage])
+  const renderGroup = useCallback(
+    ({ item }: { item: MessageGroup }) => (
+      <MemoizedMessageGroup group={item} currentUserId={session.user.id} />
+    ),
+    [session.user.id]
+  )
 
-  const getItemLayout = useCallback((data, index) => ({
-    length: 80,
-    offset: 80 * index,
-    index
-  }), [])
+  const getItemLayout = useCallback(
+    (_data: ArrayLike<MessageGroup> | null | undefined, index: number) => ({
+      length: 80,
+      offset: 80 * index,
+      index
+    }),
+    []
+  )
 
   if (isLoading) {
     return (
@@ -93,8 +116,8 @@ const ChatRoomScreen = ({ route, session }) => {
     >
       <FlatList
         ref={flatListRef}
-        data={groups || []}
-        keyExtractor={item => item.date_trunc}
+        data={(groups || []) as MessageGroup[]}
+        keyExtractor={(item) => item.date_trunc}
         renderItem={renderGroup}
         getItemLayout={getItemLayout}
         initialNumToRender={8}
