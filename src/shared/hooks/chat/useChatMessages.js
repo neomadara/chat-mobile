@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { chatService } from '../../services/chatService'
-import { supabase } from '../../lib/supabase'
+import { getSupabase } from '../../lib/supabase'
 
 export const useChatMessages = (friendId, session) => {
   const queryClient = useQueryClient()
@@ -18,7 +18,6 @@ export const useChatMessages = (friendId, session) => {
   useEffect(() => {
     if (!friendId || !session?.user?.id) return
 
-    // Nombre de canal consistente independiente del orden de los IDs
     const sortedIds = [session.user.id, friendId].sort()
     const channelName = `chat_messages_${sortedIds[0]}_${sortedIds[1]}`
 
@@ -31,18 +30,13 @@ export const useChatMessages = (friendId, session) => {
       }, 300)
     }
 
-    const channel = supabase
+    const channel = getSupabase()
       .channel(channelName)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        },
+        { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           const msg = payload.new
-          // Solo procesar mensajes de esta conversación
           const isRelevant =
             (msg.remitente === session.user.id && msg.destinatario === friendId) ||
             (msg.remitente === friendId && msg.destinatario === session.user.id)
@@ -53,7 +47,7 @@ export const useChatMessages = (friendId, session) => {
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
-      supabase.removeChannel(channel)
+      getSupabase().removeChannel(channel)
     }
   }, [friendId, session?.user?.id, queryClient])
 
