@@ -1,93 +1,120 @@
-# Welcome to your Expo app 👋
+# chat-mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Version mobile del sistema de mensajeria en tiempo real. Implementada con React Native + Expo.
 
-## Get started
+## Stack
 
-1. Install dependencies
+- React Native + Expo
+- TanStack Query (gestion de estado y cache)
+- Supabase JS (base de datos y autenticacion)
+- Expo Router (navegacion)
+- React Navigation Stack
 
-   ```bash
-   npm install
-   ```
+## Requisitos
 
-2. Start the app
+- Node.js 18+
+- Expo CLI
+- Android Studio o Xcode para emuladores
+- Cuenta en Supabase con el proyecto configurado
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Instalacion
 
 ```bash
-npm run reset-project
+# Clonar el repositorio
+git clone https://github.com/TU_USUARIO/chat-mobile.git
+cd chat-mobile
+
+# Instalar dependencias
+npm install
+
+# Configurar variables de entorno
+cp src/shared/.env-example .env
+# Editar .env con tus valores de Supabase
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
-
-## Sincronización con chat-shared (git subtree)
-
-Dentro de chat-web, edita `src/shared/services/chatService.js`:
+## Variables de entorno
 
 ```bash
-git add .
-git commit -m "feat: update chatService"
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
 ```
 
-Empuja ese cambio de vuelta a chat-shared:
+## Ejecutar en desarrollo
 
 ```bash
-git subtree push --prefix=src/shared https://github.com/TU_USUARIO/chat-shared.git main
+npm start
+
+# Android
+npm run android
+
+# iOS
+npm run ios
 ```
 
-Luego sincroniza chat-mobile:
+## Estructura
+
+```text
+src/
+├── app/
+│   ├── _layout.tsx          # Layout raiz con auth y providers
+│   └── index.tsx            # Pantalla principal
+├── Navigation/
+│   └── MessagesStack.tsx    # Stack navigator
+├── screens/app/Chat/
+│   ├── chatScreen.tsx       # Lista de conversaciones
+│   ├── ChatRoomScreen.tsx   # Chat individual con realtime
+│   └── components/
+│       └── InputChatBox.tsx # Input de mensajes
+└── shared/                  # Codigo compartido (git subtree de chat-shared)
+    ├── lib/
+    ├── services/
+    ├── hooks/
+    └── components/
+```
+
+## Sincronizar shared layer
+
+Si aun no tienes configurado el remote de shared:
 
 ```bash
-cd ../chat-mobile
-git subtree pull --prefix=src/shared https://github.com/TU_USUARIO/chat-shared.git main --squash
+git remote add shared https://github.com/TU_USUARIO/chat-shared.git
 ```
 
-
-### Usando el remote `shared`
-
-Jalar cambios desde chat-shared:
+Traer cambios de chat-shared a chat-mobile:
 
 ```bash
 git subtree pull --prefix=src/shared shared main --squash
 ```
 
-Empujar cambios hacia chat-shared:
+Empujar cambios desde chat-mobile hacia chat-shared:
 
 ```bash
 git subtree push --prefix=src/shared shared main
 ```
+
+## Flujo alternativo de sincronizacion (URL directa)
+
+Si editaste shared desde otro repositorio (por ejemplo chat-web), puedes publicar y sincronizar con URL directa:
+
+```bash
+# Desde el repo donde editaste src/shared
+git add .
+git commit -m "feat: update shared layer"
+git subtree push --prefix=src/shared https://github.com/TU_USUARIO/chat-shared.git main
+
+# Luego, desde chat-mobile
+git subtree pull --prefix=src/shared https://github.com/TU_USUARIO/chat-shared.git main --squash
+```
+
+## Funcionalidades
+
+- Login con email y password
+- Lista de conversaciones con busqueda y filtros (Todos / Sin leer / Leidos)
+- Pull-to-refresh en lista de conversaciones
+- Mensajes en tiempo real via Supabase Realtime
+- Mensajes agrupados por fecha con separadores
+- Burbujas estilo WhatsApp (propios a la derecha, recibidos a la izquierda)
+- Scroll infinito hacia arriba para cargar mensajes historicos
+- Eliminar mensajes (long press)
+- Optimizado con FlatList (initialNumToRender, maxToRenderPerBatch, windowSize)
+- Compatible con iOS y Android
